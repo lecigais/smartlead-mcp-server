@@ -1044,7 +1044,7 @@ export class SmartLeadClient {
    */
   async addLeadsToCampaign(campaignId: number, leads: any[]): Promise<any> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads`, { leads }),
+      () => this.apiClient.post(`/campaigns/${campaignId}/leads`, { lead_list: leads }),
       'add leads to campaign'
     );
     return response.data;
