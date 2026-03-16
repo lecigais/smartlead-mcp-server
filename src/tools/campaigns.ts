@@ -1,25 +1,17 @@
-/**
- * SmartLead MCP Server - Campaign Tools
- *
- * MCP tools for campaign management operations.
- *
- * @author LeadMagic Team
- * @version 1.5.0
- */
-
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SmartLeadClient } from '../client/index.js';
 import type { MCPToolResponse } from '../types/config.js';
 import {
   CreateCampaignRequestSchema,
   DeleteCampaignRequestSchema,
-  ExportCampaignDataRequestSchema,
+  ExportLeadsCsvRequestSchema,
   FetchAllCampaignsUsingLeadIdRequestSchema,
-  FetchCampaignAnalyticsByDateRangeRequestSchema,
+  GetAnalyticsOverviewRequestSchema,
+  GetCampaignAnalyticsByDateRequestSchema,
+  GetCampaignAnalyticsRequestSchema,
   GetCampaignRequestSchema,
-  GetCampaignSequenceAnalyticsRequestSchema,
   GetCampaignSequenceRequestSchema,
-  GetCampaignsWithAnalyticsRequestSchema,
+  GetCampaignStatisticsRequestSchema,
   ListCampaignsRequestSchema,
   SaveCampaignSequenceRequestSchema,
   UpdateCampaignScheduleRequestSchema,
@@ -27,336 +19,278 @@ import {
   UpdateCampaignStatusRequestSchema,
 } from '../types.js';
 
-/**
- * Register all campaign management tools
- */
 export function registerCampaignTools(
   server: McpServer,
   client: SmartLeadClient,
   formatSuccessResponse: (message: string, data: any, summary?: string) => MCPToolResponse,
   handleError: (error: any) => MCPToolResponse
 ): void {
-  // Create Campaign Tool
   server.registerTool(
     'smartlead_create_campaign',
     {
       title: 'Create Campaign',
-      description:
-        'Create a new SmartLead campaign with specified name and optional client assignment.',
+      description: 'Create a new SmartLead campaign. Starts in DRAFTED status.',
       inputSchema: CreateCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = CreateCampaignRequestSchema.parse(params);
-        const result = await client.createCampaign(validatedParams);
-        return formatSuccessResponse(
-          `Campaign created successfully`,
-          result,
-          `Campaign "${validatedParams.name}" created with ID: ${(result.data as any)?.id || 'N/A'}`
-        );
+        const p = CreateCampaignRequestSchema.parse(params);
+        const result = await client.campaigns.createCampaign(p);
+        return formatSuccessResponse('Campaign created successfully', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Update Campaign Schedule Tool
-  server.registerTool(
-    'smartlead_update_campaign_schedule',
-    {
-      title: 'Update Campaign Schedule',
-      description:
-        'Update the sending schedule for a specific campaign including timing, frequency, and delivery windows.',
-      inputSchema: UpdateCampaignScheduleRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = UpdateCampaignScheduleRequestSchema.parse(params);
-        const result = await client.updateCampaignSchedule(validatedParams.campaign_id, {
-          ...validatedParams,
-        });
-        return formatSuccessResponse('Campaign schedule updated successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Update Campaign Settings Tool
-  server.registerTool(
-    'smartlead_update_campaign_settings',
-    {
-      title: 'Update Campaign Settings',
-      description:
-        'Update various campaign settings including tracking, personalization, and delivery options.',
-      inputSchema: UpdateCampaignSettingsRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = UpdateCampaignSettingsRequestSchema.parse(params);
-        const result = await client.updateCampaignSettings(validatedParams.campaign_id, {
-          ...validatedParams,
-        });
-        return formatSuccessResponse('Campaign settings updated successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Update Campaign Status Tool
-  server.registerTool(
-    'smartlead_update_campaign_status',
-    {
-      title: 'Update Campaign Status',
-      description: 'Update the status of a campaign (e.g., start, pause, stop, archive).',
-      inputSchema: UpdateCampaignStatusRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = UpdateCampaignStatusRequestSchema.parse(params);
-        const result = await client.updateCampaignStatus(
-          validatedParams.campaign_id,
-          validatedParams.status
-        );
-        return formatSuccessResponse(
-          'Campaign status updated successfully',
-          result,
-          `Campaign ID ${validatedParams.campaign_id} status changed to: ${validatedParams.status}`
-        );
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Get Campaign Tool
   server.registerTool(
     'smartlead_get_campaign',
     {
-      title: 'Get Campaign Details',
-      description:
-        'Retrieve detailed information about a specific campaign including settings, statistics, and configuration.',
+      title: 'Get Campaign',
+      description: 'Get complete details for a single campaign by ID.',
       inputSchema: GetCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = GetCampaignRequestSchema.parse(params);
-        const result = await client.getCampaign(validatedParams.campaign_id);
-        return formatSuccessResponse(
-          'Campaign details retrieved successfully',
-          result,
-          `Retrieved details for campaign: ${(result.data as any)?.name || `ID ${validatedParams.campaign_id}`}`
-        );
+        const p = GetCampaignRequestSchema.parse(params);
+        const result = await client.campaigns.getCampaign(p.campaign_id);
+        return formatSuccessResponse('Campaign retrieved', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // List Campaigns Tool
   server.registerTool(
     'smartlead_list_campaigns',
     {
       title: 'List Campaigns',
-      description:
-        'Retrieve a list of all campaigns with optional filtering by status, client, or other criteria.',
+      description: 'List all campaigns with optional client filtering and tags.',
       inputSchema: ListCampaignsRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = ListCampaignsRequestSchema.parse(params);
-        const result = await client.listCampaigns(validatedParams);
-        return formatSuccessResponse(
-          'Campaigns listed successfully',
-          result,
-          `Found ${(result.data as any)?.campaigns?.length || 0} campaigns`
-        );
+        const p = ListCampaignsRequestSchema.parse(params);
+        const result = await client.campaigns.listCampaigns(p);
+        return formatSuccessResponse('Campaigns listed', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Save Campaign Sequence Tool
   server.registerTool(
-    'smartlead_save_campaign_sequence',
+    'smartlead_update_campaign_status',
     {
-      title: 'Save Campaign Sequence',
-      description:
-        'Save or update the email sequence for a campaign including follow-up emails and timing.',
-      inputSchema: SaveCampaignSequenceRequestSchema.shape,
+      title: 'Update Campaign Status',
+      description: 'Change campaign status to ACTIVE, PAUSED, or STOPPED.',
+      inputSchema: UpdateCampaignStatusRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = SaveCampaignSequenceRequestSchema.parse(params);
-        if (validatedParams.sequence && validatedParams.sequence.length > 0) {
-          const result = await client.saveCampaignSequence(
-            validatedParams.campaign_id,
-            validatedParams.sequence[0]!
-          );
-          return formatSuccessResponse('Campaign sequence saved successfully', result);
-        }
-        return handleError(new Error('Sequence data is missing'));
+        const p = UpdateCampaignStatusRequestSchema.parse(params);
+        const result = await client.campaigns.updateCampaignStatus(p.campaign_id, p.status);
+        return formatSuccessResponse(`Campaign status changed to ${p.status}`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Get Campaign Sequence Tool
+  server.registerTool(
+    'smartlead_update_campaign_schedule',
+    {
+      title: 'Update Campaign Schedule',
+      description: 'Set the sending schedule: timezone, days, hours, and sending limits.',
+      inputSchema: UpdateCampaignScheduleRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = UpdateCampaignScheduleRequestSchema.parse(params);
+        const { campaign_id, ...scheduleParams } = p;
+        const result = await client.campaigns.updateCampaignSchedule(campaign_id, scheduleParams);
+        return formatSuccessResponse('Campaign schedule updated', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_update_campaign_settings',
+    {
+      title: 'Update Campaign Settings',
+      description: 'Update tracking, stop conditions, unsubscribe text, and other campaign settings.',
+      inputSchema: UpdateCampaignSettingsRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = UpdateCampaignSettingsRequestSchema.parse(params);
+        const { campaign_id, ...settingsParams } = p;
+        const result = await client.campaigns.updateCampaignSettings(campaign_id, settingsParams);
+        return formatSuccessResponse('Campaign settings updated', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
   server.registerTool(
     'smartlead_get_campaign_sequence',
     {
       title: 'Get Campaign Sequence',
-      description: 'Retrieve the email sequence configuration for a specific campaign.',
+      description: 'Retrieve the email sequence configuration including all variants and delays.',
       inputSchema: GetCampaignSequenceRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = GetCampaignSequenceRequestSchema.parse(params);
-        const result = await client.getCampaignSequence(validatedParams.campaign_id);
-        return formatSuccessResponse(
-          'Campaign sequence retrieved successfully',
-          result,
-          `Retrieved sequence for campaign ID: ${validatedParams.campaign_id}`
-        );
+        const p = GetCampaignSequenceRequestSchema.parse(params);
+        const result = await client.campaigns.getCampaignSequence(p.campaign_id);
+        return formatSuccessResponse('Campaign sequence retrieved', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Get Campaigns with Analytics Tool
   server.registerTool(
-    'smartlead_get_campaigns_with_analytics',
+    'smartlead_save_campaign_sequence',
     {
-      title: 'Get Campaigns with Analytics',
-      description: 'Retrieve campaigns list with embedded analytics data for performance overview.',
-      inputSchema: GetCampaignsWithAnalyticsRequestSchema.shape,
+      title: 'Save Campaign Sequence',
+      description: 'Create or update the email sequence for a campaign with variants and delays.',
+      inputSchema: SaveCampaignSequenceRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = GetCampaignsWithAnalyticsRequestSchema.parse(params);
-        const result = await client.getCampaignsWithAnalytics(validatedParams);
-        return formatSuccessResponse(
-          'Campaigns with analytics retrieved successfully',
-          result,
-          `Retrieved ${(result.data as any)?.campaigns?.length || 0} campaigns with analytics data`
-        );
+        const p = SaveCampaignSequenceRequestSchema.parse(params);
+        const result = await client.campaigns.saveCampaignSequence(p.campaign_id, p.sequences);
+        return formatSuccessResponse('Campaign sequence saved', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Delete Campaign Tool
   server.registerTool(
     'smartlead_delete_campaign',
     {
       title: 'Delete Campaign',
-      description:
-        'Permanently delete a campaign and all associated data. This action cannot be undone.',
+      description: 'Permanently delete a campaign and all associated data. Cannot be undone.',
       inputSchema: DeleteCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = DeleteCampaignRequestSchema.parse(params);
-        const result = await client.deleteCampaign(validatedParams.campaign_id);
-        return formatSuccessResponse(
-          'Campaign deleted successfully',
-          result,
-          `Campaign ID ${validatedParams.campaign_id} has been permanently deleted`
-        );
+        const p = DeleteCampaignRequestSchema.parse(params);
+        const result = await client.campaigns.deleteCampaign(p.campaign_id);
+        return formatSuccessResponse(`Campaign ${p.campaign_id} deleted`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Export Campaign Data Tool
-  server.registerTool(
-    'smartlead_export_campaign_data',
-    {
-      title: 'Export Campaign Data',
-      description:
-        'Export campaign data in various formats (CSV, Excel, JSON) for analysis or backup purposes.',
-      inputSchema: ExportCampaignDataRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = ExportCampaignDataRequestSchema.parse(params);
-        const result = await client.exportCampaignData(validatedParams.campaign_id, {
-          ...validatedParams,
-        });
-        return formatSuccessResponse('Campaign data exported successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Fetch Campaign Analytics by Date Range Tool
-  server.registerTool(
-    'smartlead_fetch_campaign_analytics_by_date_range',
-    {
-      title: 'Fetch Campaign Analytics by Date Range',
-      description: 'Retrieve detailed analytics for a campaign within a specific date range.',
-      inputSchema: FetchCampaignAnalyticsByDateRangeRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = FetchCampaignAnalyticsByDateRangeRequestSchema.parse(params);
-        const result = await client.fetchCampaignAnalyticsByDateRange(validatedParams.campaign_id, {
-          ...validatedParams,
-        });
-        return formatSuccessResponse('Campaign analytics fetched successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Get Campaign Sequence Analytics Tool
-  server.registerTool(
-    'smartlead_get_campaign_sequence_analytics',
-    {
-      title: 'Get Campaign Sequence Analytics',
-      description:
-        'Retrieve analytics data for each step in a campaign sequence to optimize performance.',
-      inputSchema: GetCampaignSequenceAnalyticsRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = GetCampaignSequenceAnalyticsRequestSchema.parse(params);
-        const result = await client.getCampaignSequenceAnalytics(validatedParams.campaign_id, {
-          ...validatedParams,
-        });
-        return formatSuccessResponse('Campaign sequence analytics fetched successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Fetch All Campaigns Using Lead ID Tool
   server.registerTool(
     'smartlead_fetch_all_campaigns_using_lead_id',
     {
-      title: 'Fetch Campaigns by Lead ID',
-      description:
-        'Retrieve all campaigns that contain a specific lead for cross-campaign analysis.',
+      title: 'Get Campaigns by Lead',
+      description: 'Find all campaigns that contain a specific lead.',
       inputSchema: FetchAllCampaignsUsingLeadIdRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = FetchAllCampaignsUsingLeadIdRequestSchema.parse(params);
-        const result = await client.fetchAllCampaignsUsingLeadId(validatedParams.lead_id);
-        return formatSuccessResponse(
-          'Campaigns fetched successfully',
-          result,
-          `Found ${(result.data as any)?.campaigns?.length || 0} campaigns containing lead ID: ${validatedParams.lead_id}`
-        );
+        const p = FetchAllCampaignsUsingLeadIdRequestSchema.parse(params);
+        const result = await client.campaigns.fetchAllCampaignsUsingLeadId(p.lead_id);
+        return formatSuccessResponse('Campaigns for lead retrieved', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_get_campaign_analytics',
+    {
+      title: 'Get Campaign Analytics',
+      description: 'Get top-level analytics overview for a campaign.',
+      inputSchema: GetCampaignAnalyticsRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = GetCampaignAnalyticsRequestSchema.parse(params);
+        const result = await client.campaigns.getCampaignAnalytics(p.campaign_id);
+        return formatSuccessResponse('Campaign analytics retrieved', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_get_campaign_analytics_by_date',
+    {
+      title: 'Get Campaign Analytics by Date',
+      description: 'Get campaign analytics segmented by date range.',
+      inputSchema: GetCampaignAnalyticsByDateRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = GetCampaignAnalyticsByDateRequestSchema.parse(params);
+        const { campaign_id, ...dateParams } = p;
+        const result = await client.campaigns.getCampaignAnalyticsByDate(campaign_id, dateParams);
+        return formatSuccessResponse('Campaign analytics by date retrieved', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_get_campaign_statistics',
+    {
+      title: 'Get Campaign Statistics',
+      description: 'Get performance statistics for a campaign.',
+      inputSchema: GetCampaignStatisticsRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = GetCampaignStatisticsRequestSchema.parse(params);
+        const result = await client.campaigns.getCampaignStatistics(p.campaign_id);
+        return formatSuccessResponse('Campaign statistics retrieved', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_export_leads_csv',
+    {
+      title: 'Export Leads CSV',
+      description: 'Export all campaign leads as a CSV file.',
+      inputSchema: ExportLeadsCsvRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = ExportLeadsCsvRequestSchema.parse(params);
+        const result = await client.campaigns.exportLeadsCsv(p.campaign_id);
+        return formatSuccessResponse('Leads exported as CSV', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
+  server.registerTool(
+    'smartlead_get_analytics_overview',
+    {
+      title: 'Get Analytics Overview',
+      description: 'Get aggregate analytics across all campaigns.',
+      inputSchema: GetAnalyticsOverviewRequestSchema.shape,
+    },
+    async () => {
+      try {
+        const result = await client.campaigns.getAnalyticsOverview();
+        return formatSuccessResponse('Analytics overview retrieved', result);
       } catch (error) {
         return handleError(error);
       }

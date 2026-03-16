@@ -41,8 +41,8 @@ async function main(): Promise<void> {
   const { SmartLeadMCPServer } = await import('./server.js');
 
   try {
-    console.log('🚀 SmartLead MCP Server v1.6.1 - Starting...');
-    console.log('📡 Built by LeadMagic in partnership with SmartLead');
+    console.log('SmartLead MCP Server v2.0.0 - Starting...');
+    console.log('Built by LeadMagic in partnership with SmartLead');
 
     // Get and validate API key
     const apiKey = process.env.SMARTLEAD_API_KEY;

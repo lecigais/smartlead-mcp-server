@@ -1,457 +1,258 @@
-/**
- * SmartLead MCP Server - Lead Tools
- *
- * MCP tools for lead management operations.
- *
- * @author LeadMagic Team
- * @version 1.5.0
- */
-
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SmartLeadClient } from '../client/index.js';
 import type { MCPToolResponse } from '../types/config.js';
 import {
   AddLeadsToCampaignRequestSchema,
-  AddLeadToGlobalBlocklistRequestSchema,
-  DeleteLeadByCampaignRequestSchema,
-  FetchAllLeadsFromAccountRequestSchema,
+  AddToBlockListRequestSchema,
+  DeleteLeadRequestSchema,
   FetchLeadByEmailRequestSchema,
   FetchLeadCategoriesRequestSchema,
-  FetchLeadMessageHistoryRequestSchema,
-  FetchLeadsFromGlobalBlocklistRequestSchema,
-  ForwardReplyRequestSchema,
+  FetchMessageHistoryRequestSchema,
   ListLeadsByCampaignRequestSchema,
-  PauseLeadByCampaignRequestSchema,
-  ReplyToLeadFromMasterInboxRequestSchema,
-  ResumeLeadByCampaignRequestSchema,
-  UnsubscribeLeadFromAllCampaignsRequestSchema,
+  PauseLeadRequestSchema,
+  ReplyToLeadRequestSchema,
+  ResumeLeadRequestSchema,
   UnsubscribeLeadFromCampaignRequestSchema,
-  UpdateLeadByIdRequestSchema,
-  UpdateLeadCategoryRequestSchema,
+  UnsubscribeLeadGloballyRequestSchema,
+  UpdateLeadRequestSchema,
 } from '../types.js';
 
-/**
- * Register all lead management tools
- */
 export function registerLeadTools(
   server: McpServer,
   client: SmartLeadClient,
   formatSuccessResponse: (message: string, data: any, summary?: string) => MCPToolResponse,
   handleError: (error: any) => MCPToolResponse
 ): void {
-  // List Leads by Campaign Tool
   server.registerTool(
     'smartlead_list_leads_by_campaign',
     {
       title: 'List Leads by Campaign',
-      description:
-        'Retrieve all leads associated with a specific campaign, with optional filtering and pagination.',
+      description: 'Retrieve leads in a campaign with pagination.',
       inputSchema: ListLeadsByCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = ListLeadsByCampaignRequestSchema.parse(params);
-        const { campaign_id, ...queryParams } = validatedParams;
-        const result = await client.listLeadsByCampaign(campaign_id, queryParams);
-        return formatSuccessResponse(
-          'Leads retrieved successfully',
-          result,
-          `Found ${(result.data as any)?.leads?.length || 0} leads in campaign ID: ${campaign_id}`
-        );
+        const p = ListLeadsByCampaignRequestSchema.parse(params);
+        const { campaign_id, ...queryParams } = p;
+        const result = await client.leads.listLeadsByCampaign(campaign_id, queryParams);
+        return formatSuccessResponse('Leads retrieved', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Fetch Lead Categories Tool
-  server.registerTool(
-    'smartlead_fetch_lead_categories',
-    {
-      title: 'Fetch Lead Categories',
-      description:
-        'Retrieve all available lead categories for classification and filtering purposes.',
-      inputSchema: FetchLeadCategoriesRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = FetchLeadCategoriesRequestSchema.parse(params);
-        const result = await client.fetchLeadCategories();
-        return formatSuccessResponse(
-          'Lead categories retrieved successfully',
-          result,
-          `Found ${(result.data as any)?.categories?.length || 0} lead categories`
-        );
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Fetch Lead by Email Tool
   server.registerTool(
     'smartlead_fetch_lead_by_email',
     {
       title: 'Fetch Lead by Email',
-      description: 'Find and retrieve lead information using their email address.',
+      description: 'Find a lead by their email address.',
       inputSchema: FetchLeadByEmailRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = FetchLeadByEmailRequestSchema.parse(params);
-        const result = await client.fetchLeadByEmail(validatedParams.email);
-        return formatSuccessResponse(
-          'Lead retrieved successfully by email',
-          result,
-          `Found lead: ${validatedParams.email}`
-        );
+        const p = FetchLeadByEmailRequestSchema.parse(params);
+        const result = await client.leads.fetchLeadByEmail(p.email);
+        return formatSuccessResponse('Lead found', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Add Leads to Campaign Tool
+  server.registerTool(
+    'smartlead_fetch_lead_categories',
+    {
+      title: 'Fetch Lead Categories',
+      description: 'Retrieve all available lead category options.',
+      inputSchema: FetchLeadCategoriesRequestSchema.shape,
+    },
+    async () => {
+      try {
+        const result = await client.leads.fetchLeadCategories();
+        return formatSuccessResponse('Lead categories retrieved', result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
   server.registerTool(
     'smartlead_add_leads_to_campaign',
     {
       title: 'Add Leads to Campaign',
-      description:
-        'Add one or more leads to a specific campaign with validation and duplicate checking.',
+      description: 'Add up to 400 leads to a campaign with optional import settings.',
       inputSchema: AddLeadsToCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = AddLeadsToCampaignRequestSchema.parse(params);
-        const { campaign_id, leads } = validatedParams;
-        const result = await client.addLeadsToCampaign(campaign_id, leads);
-        return formatSuccessResponse(
-          'Leads added to campaign successfully',
-          result,
-          `Added ${leads.length} leads to campaign ID: ${campaign_id}`
-        );
+        const p = AddLeadsToCampaignRequestSchema.parse(params);
+        const result = await client.leads.addLeadsToCampaign(p.campaign_id, p.lead_list, p.settings);
+        return formatSuccessResponse(`Added ${p.lead_list.length} leads to campaign ${p.campaign_id}`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Resume Lead by Campaign Tool
   server.registerTool(
-    'smartlead_resume_lead_by_campaign',
+    'smartlead_update_lead',
     {
-      title: 'Resume Lead in Campaign',
-      description: 'Resume email sending to a paused lead within a specific campaign.',
-      inputSchema: ResumeLeadByCampaignRequestSchema.shape,
+      title: 'Update Lead',
+      description: 'Update a lead\'s information within a campaign.',
+      inputSchema: UpdateLeadRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = ResumeLeadByCampaignRequestSchema.parse(params);
-        const result = await client.resumeLeadByCampaign(
-          validatedParams.campaign_id,
-          validatedParams.lead_id
-        );
-        return formatSuccessResponse(
-          'Lead resumed successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} resumed in campaign ID: ${validatedParams.campaign_id}`
-        );
+        const p = UpdateLeadRequestSchema.parse(params);
+        const { campaign_id, lead_id, ...data } = p;
+        const result = await client.leads.updateLead(campaign_id, lead_id, data);
+        return formatSuccessResponse('Lead updated', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Pause Lead by Campaign Tool
   server.registerTool(
-    'smartlead_pause_lead_by_campaign',
+    'smartlead_pause_lead',
     {
-      title: 'Pause Lead in Campaign',
-      description:
-        'Pause email sending to a lead within a specific campaign without removing them.',
-      inputSchema: PauseLeadByCampaignRequestSchema.shape,
+      title: 'Pause Lead',
+      description: 'Temporarily halt email sending to a lead in a campaign.',
+      inputSchema: PauseLeadRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = PauseLeadByCampaignRequestSchema.parse(params);
-        const result = await client.pauseLeadByCampaign(
-          validatedParams.campaign_id,
-          validatedParams.lead_id
-        );
-        return formatSuccessResponse(
-          'Lead paused successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} paused in campaign ID: ${validatedParams.campaign_id}`
-        );
+        const p = PauseLeadRequestSchema.parse(params);
+        const result = await client.leads.pauseLead(p.campaign_id, p.lead_id);
+        return formatSuccessResponse(`Lead ${p.lead_id} paused`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Delete Lead by Campaign Tool
   server.registerTool(
-    'smartlead_delete_lead_by_campaign',
+    'smartlead_resume_lead',
     {
-      title: 'Delete Lead from Campaign',
-      description: 'Remove a lead from a specific campaign permanently.',
-      inputSchema: DeleteLeadByCampaignRequestSchema.shape,
+      title: 'Resume Lead',
+      description: 'Resume email sending to a paused lead.',
+      inputSchema: ResumeLeadRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = DeleteLeadByCampaignRequestSchema.parse(params);
-        const result = await client.deleteLeadByCampaign(
-          validatedParams.campaign_id,
-          validatedParams.lead_id
-        );
-        return formatSuccessResponse(
-          'Lead deleted from campaign successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} removed from campaign ID: ${validatedParams.campaign_id}`
-        );
+        const p = ResumeLeadRequestSchema.parse(params);
+        const result = await client.leads.resumeLead(p.campaign_id, p.lead_id);
+        return formatSuccessResponse(`Lead ${p.lead_id} resumed`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Unsubscribe Lead from Campaign Tool
+  server.registerTool(
+    'smartlead_delete_lead',
+    {
+      title: 'Delete Lead',
+      description: 'Remove a lead from a campaign permanently.',
+      inputSchema: DeleteLeadRequestSchema.shape,
+    },
+    async (params) => {
+      try {
+        const p = DeleteLeadRequestSchema.parse(params);
+        const result = await client.leads.deleteLead(p.campaign_id, p.lead_id);
+        return formatSuccessResponse(`Lead ${p.lead_id} deleted from campaign`, result);
+      } catch (error) {
+        return handleError(error);
+      }
+    }
+  );
+
   server.registerTool(
     'smartlead_unsubscribe_lead_from_campaign',
     {
       title: 'Unsubscribe Lead from Campaign',
-      description: 'Unsubscribe a lead from a specific campaign, stopping all future emails.',
+      description: 'Unsubscribe a lead from a specific campaign.',
       inputSchema: UnsubscribeLeadFromCampaignRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = UnsubscribeLeadFromCampaignRequestSchema.parse(params);
-        const result = await client.unsubscribeLeadFromCampaign(
-          validatedParams.campaign_id,
-          validatedParams.lead_id
-        );
-        return formatSuccessResponse(
-          'Lead unsubscribed from campaign successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} unsubscribed from campaign ID: ${validatedParams.campaign_id}`
-        );
+        const p = UnsubscribeLeadFromCampaignRequestSchema.parse(params);
+        const result = await client.leads.unsubscribeLeadFromCampaign(p.campaign_id, p.lead_id);
+        return formatSuccessResponse(`Lead ${p.lead_id} unsubscribed from campaign`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Unsubscribe Lead from All Campaigns Tool
   server.registerTool(
-    'smartlead_unsubscribe_lead_from_all_campaigns',
+    'smartlead_unsubscribe_lead_globally',
     {
-      title: 'Unsubscribe Lead from All Campaigns',
-      description: 'Unsubscribe a lead from all campaigns across the entire account.',
-      inputSchema: UnsubscribeLeadFromAllCampaignsRequestSchema.shape,
+      title: 'Unsubscribe Lead Globally',
+      description: 'Unsubscribe a lead from all campaigns.',
+      inputSchema: UnsubscribeLeadGloballyRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = UnsubscribeLeadFromAllCampaignsRequestSchema.parse(params);
-        const result = await client.unsubscribeLeadFromAllCampaigns(validatedParams.lead_id);
-        return formatSuccessResponse(
-          'Lead unsubscribed from all campaigns successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} unsubscribed from all campaigns`
-        );
+        const p = UnsubscribeLeadGloballyRequestSchema.parse(params);
+        const result = await client.leads.unsubscribeLeadGlobally(p.lead_id);
+        return formatSuccessResponse(`Lead ${p.lead_id} unsubscribed from all campaigns`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Add Lead to Global Blocklist Tool
   server.registerTool(
-    'smartlead_add_lead_to_global_blocklist',
+    'smartlead_add_to_block_list',
     {
-      title: 'Add Lead to Global Blocklist',
-      description: 'Add a lead or domain to the global blocklist to prevent future contact.',
-      inputSchema: AddLeadToGlobalBlocklistRequestSchema.shape,
+      title: 'Add to Block List',
+      description: 'Add an email or domain to the global block list.',
+      inputSchema: AddToBlockListRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = AddLeadToGlobalBlocklistRequestSchema.parse(params);
-        const result = await client.addLeadToGlobalBlocklist(validatedParams.email);
-        return formatSuccessResponse(
-          'Lead added to global blocklist successfully',
-          result,
-          `Email ${validatedParams.email} added to global blocklist`
-        );
+        const p = AddToBlockListRequestSchema.parse(params);
+        const result = await client.leads.addToBlockList(p.email);
+        return formatSuccessResponse(`${p.email} added to block list`, result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Fetch All Leads from Account Tool
   server.registerTool(
-    'smartlead_fetch_all_leads_from_account',
+    'smartlead_fetch_message_history',
     {
-      title: 'Fetch All Leads from Account',
-      description:
-        'Retrieve all leads from the entire account with optional filtering and pagination.',
-      inputSchema: FetchAllLeadsFromAccountRequestSchema.shape,
+      title: 'Fetch Message History',
+      description: 'Get the complete email exchange history for a lead in a campaign.',
+      inputSchema: FetchMessageHistoryRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = FetchAllLeadsFromAccountRequestSchema.parse(params);
-        const result = await client.fetchAllLeadsFromAccount(validatedParams);
-        return formatSuccessResponse(
-          'All leads retrieved successfully',
-          result,
-          `Found ${(result.data as any)?.leads?.length || 0} leads in account`
-        );
+        const p = FetchMessageHistoryRequestSchema.parse(params);
+        const result = await client.leads.fetchMessageHistory(p.campaign_id, p.lead_id);
+        return formatSuccessResponse('Message history retrieved', result);
       } catch (error) {
         return handleError(error);
       }
     }
   );
 
-  // Fetch Leads from Global Blocklist Tool
   server.registerTool(
-    'smartlead_fetch_leads_from_global_blocklist',
+    'smartlead_reply_to_lead',
     {
-      title: 'Fetch Leads from Global Blocklist',
-      description: 'Retrieve all leads and domains currently on the global blocklist.',
-      inputSchema: FetchLeadsFromGlobalBlocklistRequestSchema.shape,
+      title: 'Reply to Lead',
+      description: 'Send a reply to a lead\'s email thread within a campaign.',
+      inputSchema: ReplyToLeadRequestSchema.shape,
     },
     async (params) => {
       try {
-        const validatedParams = FetchLeadsFromGlobalBlocklistRequestSchema.parse(params);
-        const result = await client.fetchLeadsFromGlobalBlocklist(validatedParams);
-        return formatSuccessResponse(
-          'Global blocklist retrieved successfully',
-          result,
-          `Found ${(result.data as any)?.blocked_leads?.length || 0} entries in global blocklist`
-        );
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Update Lead by ID Tool
-  server.registerTool(
-    'smartlead_update_lead_by_id',
-    {
-      title: 'Update Lead by ID',
-      description:
-        'Update lead information using the lead ID, including contact details and custom fields.',
-      inputSchema: UpdateLeadByIdRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = UpdateLeadByIdRequestSchema.parse(params);
-        const result = await client.updateLeadById(validatedParams.lead_id, validatedParams);
-        return formatSuccessResponse('Lead updated successfully', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Update Lead Category Tool
-  server.registerTool(
-    'smartlead_update_lead_category',
-    {
-      title: 'Update Lead Category',
-      description: 'Update the category classification of a lead within a specific campaign.',
-      inputSchema: UpdateLeadCategoryRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = UpdateLeadCategoryRequestSchema.parse(params);
-        const result = await client.updateLeadCategory(
-          validatedParams.campaign_id,
-          validatedParams.lead_id,
-          validatedParams.category
-        );
-        return formatSuccessResponse(
-          'Lead category updated successfully',
-          result,
-          `Lead ID ${validatedParams.lead_id} category changed to: ${validatedParams.category}`
-        );
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Fetch Lead Message History Tool
-  server.registerTool(
-    'smartlead_fetch_lead_message_history',
-    {
-      title: 'Fetch Lead Message History',
-      description: 'Retrieve the complete message history for a lead within a specific campaign.',
-      inputSchema: FetchLeadMessageHistoryRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = FetchLeadMessageHistoryRequestSchema.parse(params);
-        const result = await client.fetchLeadMessageHistory(
-          validatedParams.campaign_id,
-          validatedParams.lead_id
-        );
-        return formatSuccessResponse(
-          'Lead message history retrieved successfully',
-          result,
-          `Retrieved message history for lead ID ${validatedParams.lead_id} in campaign ID: ${validatedParams.campaign_id}`
-        );
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Reply to Lead from Master Inbox Tool
-  server.registerTool(
-    'smartlead_reply_to_lead_from_master_inbox',
-    {
-      title: 'Reply to Lead from Master Inbox',
-      description:
-        'Send a reply to a lead from the master inbox with tracking and personalization.',
-      inputSchema: ReplyToLeadFromMasterInboxRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = ReplyToLeadFromMasterInboxRequestSchema.parse(params);
-        const result = await client.replyToLeadFromMasterInbox(
-          validatedParams.campaign_id,
-          validatedParams.lead_id,
-          {
-            subject: validatedParams.subject || '',
-            message: validatedParams.message,
-          }
-        );
-        return formatSuccessResponse('Successfully replied to lead', result);
-      } catch (error) {
-        return handleError(error);
-      }
-    }
-  );
-
-  // Forward Reply Tool
-  server.registerTool(
-    'smartlead_forward_reply',
-    {
-      title: 'Forward Reply',
-      description: 'Forward a lead reply to another email address or team member.',
-      inputSchema: ForwardReplyRequestSchema.shape,
-    },
-    async (params) => {
-      try {
-        const validatedParams = ForwardReplyRequestSchema.parse(params);
-        const { campaign_id, lead_id, ...forwardData } = validatedParams;
-        const result = await client.forwardReply(campaign_id, lead_id, forwardData);
-        return formatSuccessResponse(
-          'Reply forwarded successfully',
-          result,
-          `Reply from lead ID ${lead_id} forwarded successfully`
-        );
+        const p = ReplyToLeadRequestSchema.parse(params);
+        const { campaign_id, ...replyData } = p;
+        const result = await client.leads.replyToLead(campaign_id, replyData);
+        return formatSuccessResponse('Reply sent', result);
       } catch (error) {
         return handleError(error);
       }

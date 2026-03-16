@@ -1,61 +1,14 @@
-/**
- * SmartLead MCP Server - Lead Management Client
- *
- * Client module for lead management API endpoints.
- * Handles all lead-related operations including CRUD operations, status management, and messaging.
- *
- * @author LeadMagic Team
- * @version 1.5.0
- */
-
 import { BaseSmartLeadClient } from '../../client/base.js';
-import type {
-  Lead,
-  ListLeadsByCampaignRequest,
-  ReplyToLeadFromMasterInboxRequest,
-  SuccessResponse,
-  UpdateLeadByIdRequest,
-} from '../../types.js';
+import type { SuccessResponse } from '../../types.js';
 
-// Additional types for leads client
-export interface FetchAllLeadsFromAccountParams {
-  limit?: number;
-  offset?: number;
-  search?: string;
-  status?: string;
-}
-
-export interface FetchLeadsFromGlobalBlocklistParams {
-  limit?: number;
-  offset?: number;
-}
-
-export interface ForwardReplyRequest {
-  forward_to_email: string;
-  message?: string;
-  include_original?: boolean;
-}
-
-/**
- * Lead Management Client
- *
- * Provides methods for managing SmartLead leads including:
- * - Adding and updating leads
- * - Managing lead status and categories
- * - Lead messaging and communication
- * - Global blocklist management
- */
 export class LeadClient extends BaseSmartLeadClient {
-  // ================================
-  // LEAD MANAGEMENT METHODS
-  // ================================
-
   /**
-   * List all leads by campaign ID
+   * List all leads in a campaign.
+   * GET /campaigns/{campaign_id}/leads
    */
   async listLeadsByCampaign(
     campaignId: number,
-    params?: ListLeadsByCampaignRequest
+    params?: { offset?: number; limit?: number }
   ): Promise<SuccessResponse> {
     const response = await this.withRetry(
       () => this.apiClient.get(`/campaigns/${campaignId}/leads`, { params }),
@@ -65,75 +18,109 @@ export class LeadClient extends BaseSmartLeadClient {
   }
 
   /**
-   * Fetch lead categories
-   */
-  async fetchLeadCategories(): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.get('/leads/categories'),
-      'fetch lead categories'
-    );
-    return response.data;
-  }
-
-  /**
-   * Fetch lead by email address
+   * Fetch a lead by email address.
+   * GET /leads/
    */
   async fetchLeadByEmail(email: string): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.get('/leads/email', { params: { email } }),
+      () => this.apiClient.get('/leads/', { params: { email } }),
       'fetch lead by email'
     );
     return response.data;
   }
 
   /**
-   * Add leads to a campaign by ID
+   * Fetch all available lead categories.
+   * GET /leads/fetch-categories
    */
-  async addLeadsToCampaign(campaignId: number, leads: Lead[]): Promise<SuccessResponse> {
+  async fetchLeadCategories(): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads`, { lead_list: leads }),
+      () => this.apiClient.get('/leads/fetch-categories'),
+      'fetch lead categories'
+    );
+    return response.data;
+  }
+
+  /**
+   * Add leads to a campaign.
+   * POST /campaigns/{campaign_id}/leads
+   */
+  async addLeadsToCampaign(
+    campaignId: number,
+    leadList: Record<string, unknown>[],
+    settings?: Record<string, unknown>
+  ): Promise<SuccessResponse> {
+    const body: Record<string, unknown> = { lead_list: leadList };
+    if (settings) {
+      body.settings = settings;
+    }
+    const response = await this.withRetry(
+      () => this.apiClient.post(`/campaigns/${campaignId}/leads`, body),
       'add leads to campaign'
     );
     return response.data;
   }
 
   /**
-   * Resume lead by campaign ID
+   * Update a lead in a campaign.
+   * POST /campaigns/{campaign_id}/leads/{lead_id}
    */
-  async resumeLeadByCampaign(campaignId: number, leadId: number): Promise<SuccessResponse> {
+  async updateLead(
+    campaignId: number,
+    leadId: number,
+    data: Record<string, unknown>
+  ): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/resume`),
-      'resume lead by campaign'
+      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}`, data),
+      'update lead'
     );
     return response.data;
   }
 
   /**
-   * Pause lead by campaign ID
+   * Pause a lead in a campaign.
+   * POST /campaigns/{campaign_id}/leads/{lead_id}/pause
    */
-  async pauseLeadByCampaign(campaignId: number, leadId: number): Promise<SuccessResponse> {
+  async pauseLead(campaignId: number, leadId: number): Promise<SuccessResponse> {
     const response = await this.withRetry(
       () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/pause`),
-      'pause lead by campaign'
+      'pause lead'
     );
     return response.data;
   }
 
   /**
-   * Delete lead by campaign ID
+   * Resume a lead in a campaign.
+   * POST /campaigns/{campaign_id}/leads/{lead_id}/resume
    */
-  async deleteLeadByCampaign(campaignId: number, leadId: number): Promise<SuccessResponse> {
+  async resumeLead(campaignId: number, leadId: number): Promise<SuccessResponse> {
+    const response = await this.withRetry(
+      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/resume`),
+      'resume lead'
+    );
+    return response.data;
+  }
+
+  /**
+   * Delete a lead from a campaign.
+   * DELETE /campaigns/{campaign_id}/leads/{lead_id}
+   */
+  async deleteLead(campaignId: number, leadId: number): Promise<SuccessResponse> {
     const response = await this.withRetry(
       () => this.apiClient.delete(`/campaigns/${campaignId}/leads/${leadId}`),
-      'delete lead by campaign'
+      'delete lead'
     );
     return response.data;
   }
 
   /**
-   * Unsubscribe/Pause lead from campaign
+   * Unsubscribe a lead from a specific campaign.
+   * POST /campaigns/{campaign_id}/leads/{lead_id}/unsubscribe
    */
-  async unsubscribeLeadFromCampaign(campaignId: number, leadId: number): Promise<SuccessResponse> {
+  async unsubscribeLeadFromCampaign(
+    campaignId: number,
+    leadId: number
+  ): Promise<SuccessResponse> {
     const response = await this.withRetry(
       () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/unsubscribe`),
       'unsubscribe lead from campaign'
@@ -142,116 +129,55 @@ export class LeadClient extends BaseSmartLeadClient {
   }
 
   /**
-   * Unsubscribe lead from all campaigns
+   * Unsubscribe a lead globally from all campaigns.
+   * POST /leads/{lead_id}/unsubscribe
    */
-  async unsubscribeLeadFromAllCampaigns(leadId: number): Promise<SuccessResponse> {
+  async unsubscribeLeadGlobally(leadId: number): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/leads/${leadId}/unsubscribe-all`),
-      'unsubscribe lead from all campaigns'
+      () => this.apiClient.post(`/leads/${leadId}/unsubscribe`),
+      'unsubscribe lead globally'
     );
     return response.data;
   }
 
   /**
-   * Add lead/domain to global block list
+   * Add an email or domain to the global block list.
+   * POST /leads/add-domain-block-list
    */
-  async addLeadToGlobalBlocklist(email: string): Promise<SuccessResponse> {
+  async addToBlockList(email: string): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post('/leads/global-blocklist', { email }),
-      'add lead to global blocklist'
+      () => this.apiClient.post('/leads/add-domain-block-list', { email }),
+      'add to block list'
     );
     return response.data;
   }
 
   /**
-   * Fetch all leads from entire account
+   * Fetch message history for a lead in a campaign.
+   * GET /campaigns/{campaign_id}/leads/{lead_id}/message-history
    */
-  async fetchAllLeadsFromAccount(
-    params?: FetchAllLeadsFromAccountParams
-  ): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.get('/leads', { params }),
-      'fetch all leads from account'
-    );
-    return response.data;
-  }
-
-  /**
-   * Fetch leads from global block list
-   */
-  async fetchLeadsFromGlobalBlocklist(
-    params?: FetchLeadsFromGlobalBlocklistParams
-  ): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.get('/leads/global-blocklist', { params }),
-      'fetch leads from global blocklist'
-    );
-    return response.data;
-  }
-
-  /**
-   * Update lead using the lead ID
-   */
-  async updateLeadById(leadId: number, leadData: UpdateLeadByIdRequest): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.post(`/leads/${leadId}`, leadData),
-      'update lead by ID'
-    );
-    return response.data;
-  }
-
-  /**
-   * Update a lead's category based on their campaign
-   */
-  async updateLeadCategory(
+  async fetchMessageHistory(
     campaignId: number,
-    leadId: number,
-    category: string
+    leadId: number
   ): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/category`, { category }),
-      'update lead category'
+      () => this.apiClient.get(`/campaigns/${campaignId}/leads/${leadId}/message-history`),
+      'fetch message history'
     );
     return response.data;
   }
 
   /**
-   * Fetch lead message history based on campaign
+   * Reply to a lead's email thread in a campaign.
+   * POST /campaigns/{campaign_id}/reply-email-thread
    */
-  async fetchLeadMessageHistory(campaignId: number, leadId: number): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.get(`/campaigns/${campaignId}/leads/${leadId}/messages`),
-      'fetch lead message history'
-    );
-    return response.data;
-  }
-
-  /**
-   * Reply to lead from master inbox via API
-   */
-  async replyToLeadFromMasterInbox(
+  async replyToLead(
     campaignId: number,
-    leadId: number,
-    message: ReplyToLeadFromMasterInboxRequest
+    replyData: { email_account_id: number; lead_id: number; email_body: string }
   ): Promise<SuccessResponse> {
     const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/reply`, message),
-      'reply to lead from master inbox'
-    );
-    return response.data;
-  }
-
-  /**
-   * Forward a reply
-   */
-  async forwardReply(
-    campaignId: number,
-    leadId: number,
-    forwardData: ForwardReplyRequest
-  ): Promise<SuccessResponse> {
-    const response = await this.withRetry(
-      () => this.apiClient.post(`/campaigns/${campaignId}/leads/${leadId}/forward`, forwardData),
-      'forward reply'
+      () => this.apiClient.post(`/campaigns/${campaignId}/reply-email-thread`, replyData),
+      'reply to lead'
     );
     return response.data;
   }
