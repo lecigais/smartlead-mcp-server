@@ -53,7 +53,7 @@ export const UpdateCampaignScheduleRequestSchema = z.object({
   start_hour: z.string().describe('Start hour in 24-hour format (e.g., "09:00")'),
   end_hour: z.string().describe('End hour in 24-hour format (e.g., "17:00")'),
   min_time_btw_emails: z.number().describe('Minimum time between emails in minutes'),
-  max_leads_per_day: z.number().describe('Maximum leads to contact per day'),
+  max_new_leads_per_day: z.number().describe('Maximum new leads to contact per day'),
 });
 
 export const UpdateCampaignSettingsRequestSchema = z.object({
@@ -216,10 +216,11 @@ export const AddLeadsToCampaignRequestSchema = z.object({
     last_name: z.string().optional().describe('Last name'),
     company_name: z.string().optional().describe('Company name'),
     company_url: z.string().optional().describe('Company website URL'),
-    title: z.string().optional().describe('Job title'),
-    phone: z.string().optional().describe('Phone number'),
-    linkedin_url: z.string().optional().describe('LinkedIn profile URL'),
-    custom_fields: z.record(z.unknown()).optional().describe('Custom field values'),
+    website: z.string().optional().describe('Website URL'),
+    location: z.string().optional().describe('Location'),
+    phone_number: z.string().optional().describe('Phone number'),
+    linkedin_profile: z.string().optional().describe('LinkedIn profile URL'),
+    custom_fields: z.record(z.unknown()).optional().describe('Custom fields (e.g., job_title, industry). Max 200 key-value pairs.'),
   })).describe('Array of leads (max 400 per request)'),
   settings: z.object({
     ignore_global_block_list: z.boolean().optional(),
@@ -232,13 +233,16 @@ export const AddLeadsToCampaignRequestSchema = z.object({
 export const UpdateLeadRequestSchema = z.object({
   campaign_id: z.number().describe('Campaign ID'),
   lead_id: z.number().describe('Lead ID'),
-  email: z.string().email().optional().describe('Updated email'),
+  email: z.string().email().describe('Lead email (required even if not changing)'),
   first_name: z.string().optional().describe('Updated first name'),
   last_name: z.string().optional().describe('Updated last name'),
   company_name: z.string().optional().describe('Updated company name'),
-  title: z.string().optional().describe('Updated job title'),
-  phone: z.string().optional().describe('Updated phone'),
-  custom_fields: z.record(z.unknown()).optional().describe('Updated custom fields'),
+  website: z.string().optional().describe('Updated website URL'),
+  location: z.string().optional().describe('Updated location'),
+  phone_number: z.string().optional().describe('Updated phone number'),
+  linkedin_profile: z.string().optional().describe('Updated LinkedIn profile URL'),
+  company_url: z.string().optional().describe('Updated company URL'),
+  custom_fields: z.record(z.unknown()).optional().describe('Updated custom fields (merged, not replaced)'),
 });
 
 export const PauseLeadRequestSchema = z.object({
