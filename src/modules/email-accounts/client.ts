@@ -139,7 +139,7 @@ export class EmailAccountManagementClient extends BaseSmartLeadClient {
     const response = await this.withRetry(
       () =>
         this.apiClient.post(`/campaigns/${campaignId}/email-accounts`, {
-          email_account_id: emailAccountId,
+          email_account_ids: [emailAccountId],
         }),
       'add email account to campaign'
     );
